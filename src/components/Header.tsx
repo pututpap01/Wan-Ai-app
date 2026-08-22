@@ -1,5 +1,5 @@
 import React from "react";
-import { Sparkles, Smartphone, Key, History, Clapperboard, Layers } from "lucide-react";
+import { Sparkles, Smartphone, Key, History, Clapperboard, Layers, Workflow } from "lucide-react";
 
 interface HeaderProps {
   activeTab: "generator" | "storyboard" | "gallery";
@@ -131,14 +131,14 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
-          {/* Android APK Integration Guide */}
+          {/* Git & Android APK Workflow Hub */}
           <button
             id="android-guide-modal-btn"
             onClick={onOpenAndroidGuide}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-950/60 border border-indigo-800/60 text-indigo-300 hover:bg-indigo-900/60 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-950 to-sky-950 border border-sky-800/60 text-sky-300 hover:border-sky-500/80 transition-all shadow-sm"
           >
-            <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
-            <span>APK Guide</span>
+            <Workflow className="w-3.5 h-3.5 text-sky-400" />
+            <span>Git &amp; APK Hub</span>
           </button>
 
           {/* RapidAPI / Runway config */}
