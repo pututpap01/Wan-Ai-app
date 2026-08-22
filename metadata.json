@@ -1,0 +1,7 @@
+{
+  "name": "AI Video Generator",
+  "description": "Create stunning AI videos with Text-to-Video, Image-to-Video, Gemini prompt cinematography enhancement, multi-scene storyboarding, and video rendering.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
