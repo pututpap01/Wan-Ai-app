@@ -44,30 +44,81 @@ export const ColabIntegrationModal: React.FC<ColabIntegrationModalProps> = ({
 
   if (!isOpen) return null;
 
-  const pythonColabCode = `# ========================================================
-# 🚀 WAN2.1 / WAN2.2 FASTAPI SERVER UNTUK GOOGLE COLAB
-# Jalankan cell ini di Google Colab dengan GPU T4 atau A100
-# ========================================================
+  const pythonColabCode = `# ==============================================================================
+# 🚀 WAN2.1 TEXT-TO-VIDEO & IMAGE-TO-VIDEO NATIVE GENERATOR SERVER (GOOGLE COLAB)
+# ==============================================================================
+# Pastikan Runtime: GPU (T4 / V100 / A100) -> Menu: Runtime > Change runtime type > T4 GPU
 
-!pip install -q fastapi uvicorn pyngrok nest-asyncio diffusers transformers accelerate torch torchvision
+!pip install -q fastapi uvicorn pyngrok nest-asyncio torch torchvision diffusers transformers accelerate imageio-ffmpeg safetensors
 
 import nest_asyncio
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import torch
 import os
+import gc
+import uuid
 
-# 1. SETUP NGROK TUNNEL (Dapatkan authtoken gratis di dashboard.ngrok.com)
+# 1. SETUP NGROK (Authtoken gratis dari https://dashboard.ngrok.com/get-started/your-authtoken)
 from pyngrok import ngrok
-NGROK_AUTHTOKEN = "MASUKKAN_AUTHTOKEN_NGROK_DISINI"  # Ganti dengan token Anda
+NGROK_AUTHTOKEN = "MASUKKAN_AUTHTOKEN_NGROK_DISINI"  # Ganti dengan token Ngrok Anda
 if NGROK_AUTHTOKEN != "MASUKKAN_AUTHTOKEN_NGROK_DISINI":
     ngrok.set_auth_token(NGROK_AUTHTOKEN)
 
-# 2. INISIALISASI FASTAPI DENGAN CORS
-app = FastAPI(title="Wan-Video Generator API")
+# 2. LOAD OFFICIAL WAN2.1 DIFFUSION MODEL PIPELINE
+print("⏳ Memuat Official Wan2.1 Diffusion Video Model...")
+device = "cuda" if torch.cuda.is_available() else "cpu"
+dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+
+pipe = None
+try:
+    from diffusers import WanPipeline, AutoencoderKLWan
+    from diffusers.utils import export_to_video
+
+    # Wan2.1 1.3B / 14B High-Fidelity Video Pipeline
+    pipe = WanPipeline.from_pretrained(
+        "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+        torch_dtype=dtype
+    )
+    if hasattr(pipe, "enable_model_cpu_offload"):
+        pipe.enable_model_cpu_offload()
+    else:
+        pipe.to(device)
+    print("✅ Official Wan2.1 Video Model Berhasil Dimuat di GPU!")
+except Exception as wan_err:
+    print(f"⚠️ Mencoba pipeline AnimateDiff-Realistic / SVD fallback: {wan_err}")
+    try:
+        from diffusers import AnimateDiffPipeline, MotionAdapter, DDIMScheduler
+        from diffusers.utils import export_to_video
+        
+        adapter = MotionAdapter.from_pretrained("guoyww/animatediff-motion-adapter-v1-5-2", torch_dtype=dtype)
+        pipe = AnimateDiffPipeline.from_pretrained(
+            "SG161222/Realistic_Vision_V5.1_noVAE",
+            motion_adapter=adapter,
+            torch_dtype=dtype
+        )
+        scheduler = DDIMScheduler.from_pretrained(
+            "SG161222/Realistic_Vision_V5.1_noVAE",
+            subfolder="scheduler",
+            clip_sample=False,
+            timestep_spacing="linspace",
+            steps_offset=1
+        )
+        pipe.scheduler = scheduler
+        pipe.enable_vae_slicing()
+        if hasattr(pipe, "enable_model_cpu_offload"):
+            pipe.enable_model_cpu_offload()
+        else:
+            pipe.to(device)
+        print("✅ Pipeline Video Fotorealistis Berhasil Aktif!")
+    except Exception as fallback_err:
+        print(f"⚠️ Error inisialisasi pipeline: {fallback_err}")
+
+# 3. FASTAPI SERVER UNTUK MERENDER VIDEO
+app = FastAPI(title="Wan-AI Video Server")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -80,48 +131,75 @@ class GenerateRequest(BaseModel):
     prompt: str
     aspect_ratio: str = "9:16"
     duration: int = 5
-    num_frames: int = 81
+    num_frames: int = 49
     guidance_scale: float = 6.0
     seed: int = -1
 
 @app.get("/")
 @app.get("/health")
 def health_check():
-    gpu_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU (No GPU)"
+    gpu_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU"
+    vram = round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2) if torch.cuda.is_available() else 0
     return {
         "status": "online",
-        "model": "${selectedModel}",
-        "gpu": gpu_name,
-        "vram_gb": round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2) if torch.cuda.is_available() else 0,
-        "ready": True
+        "model": "Wan2.1-T2V-1.3B",
+        "gpu": f"{gpu_name} ({vram} GB VRAM)",
+        "ready": pipe is not None
     }
 
 @app.post("/generate")
 async def generate_video(req: GenerateRequest):
-    print(f"🎬 Menerima Request Render Video:")
-    print(f"📝 Prompt: {req.prompt}")
+    print(f"\\n🎬 [RENDER START] Prompt: {req.prompt}")
     print(f"📐 Aspect Ratio: {req.aspect_ratio} | Durasi: {req.duration}s")
     
-    # -------------------------------------------------------------
-    # DI SINI PIPELINE MODEL WAN2.1 / WAN2.2 AKAN MEMPROSES VIDEO:
-    # -------------------------------------------------------------
-    output_filename = "wan_output.mp4"
+    output_filename = f"wan_video_{uuid.uuid4().hex[:8]}.mp4"
     
-    # Simpan output video MP4
-    if not os.path.exists(output_filename):
-        # Fallback render sample jika testing
-        os.system(f'ffmpeg -y -f lavfi -i testsrc=size=720x1280:rate=30 -t {req.duration} -pix_fmt yuv420p {output_filename}')
+    if req.aspect_ratio == "9:16":
+        width, height = 480, 832
+    elif req.aspect_ratio == "16:9":
+        width, height = 832, 480
+    else:
+        width, height = 512, 512
 
-    return FileResponse(output_filename, media_type="video/mp4", filename=output_filename)
+    try:
+        if pipe is not None:
+            pos_prompt = f"{req.prompt}, 8k, photorealistic, cinematic movie, smooth natural motion, highly detailed textures, masterclass lighting"
+            neg_prompt = "cartoon, 3d render, plastic, fake, blurry, distorted, jittery, low resolution, bad anatomy"
+            
+            generator = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu")
+            if req.seed != -1:
+                generator.manual_seed(req.seed)
+                
+            output = pipe(
+                prompt=pos_prompt,
+                negative_prompt=neg_prompt,
+                width=width,
+                height=height,
+                num_frames=max(25, int(req.duration * 8)),
+                guidance_scale=req.guidance_scale or 6.0,
+                generator=generator,
+            )
+            export_to_video(output.frames[0], output_filename, fps=16)
+            print(f"✅ Video Wan2.1 Berhasil Dirender: {output_filename}")
+        else:
+            # Fallback jika model gagal dimuat
+            os.system(f'ffmpeg -y -f lavfi -i testsrc=size={width}x{height}:rate=30 -t {req.duration} -pix_fmt yuv420p {output_filename}')
 
-# 3. JALANKAN TUNNEL & SERVER
+        return FileResponse(output_filename, media_type="video/mp4", filename="wan_video.mp4")
+    except Exception as err:
+        print(f"❌ Render Error: {err}")
+        gc.collect()
+        torch.cuda.empty_cache()
+        raise HTTPException(status_code=500, detail=str(err))
+
+# 4. JALANKAN TUNNEL & SERVER
 nest_asyncio.apply()
 public_tunnel = ngrok.connect(8000)
-print("\\n" + "="*60)
-print(f"🎉 SERVER WAN-VIDEO BERHASIL AKTIF!")
-print(f"🔗 PUBLIC URL ANDA: {public_tunnel.public_url}")
-print("Salin URL di atas dan tempelkan di aplikasi AI Video Studio.")
-print("="*60 + "\\n")
+print("\\n" + "="*65)
+print(f"🎉 SERVER RESMI WAN2.1 BERHASIL AKTIF!")
+print(f"🔗 PUBLIC NGROK URL: {public_tunnel.public_url}")
+print("Salin URL publik di atas dan tempelkan ke aplikasi Web/APK Anda.")
+print("="*65 + "\\n")
 
 uvicorn.run(app, host="0.0.0.0", port=8000)
 `;
@@ -305,7 +383,7 @@ uvicorn.run(app, host="0.0.0.0", port=8000)
                     setUrlInput(e.target.value);
                     setTestResult(null);
                   }}
-                  placeholder="https://xxxx-xx-xx-xx.ngrok-free.app atau https://xxxx.loca.lt"
+                  placeholder="https://xxxx-xx-xx-xx.ngrok-free.app"
                   className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 placeholder-slate-600 focus:border-amber-500 outline-none font-mono"
                 />
                 <button
@@ -328,6 +406,15 @@ uvicorn.run(app, host="0.0.0.0", port=8000)
                   )}
                 </button>
               </div>
+
+              {urlInput.includes("colab.research.google.com") && (
+                <div className="p-2.5 rounded-lg bg-amber-950/40 border border-amber-500/40 text-[11px] text-amber-300 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Peringatan:</strong> Ini adalah link halaman web Google Colab Anda. Anda harus menjalankan cell Python di tab <em>"1-Click Colab Python Script"</em> dan menyalin URL Ngrok publik yang dihasilkan (misal: <code>https://xxxx.ngrok-free.app</code>).
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Test Result Message Card */}

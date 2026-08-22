@@ -353,27 +353,88 @@ app.post("/api/rapidapi/test", async (req, res) => {
 // 7. Colab Tunnel Ping / Test Endpoint
 app.post("/api/colab/test", async (req, res) => {
   const { url } = req.body;
-  if (!url) {
-    return res.json({ online: false, error: "Colab URL is required" });
+  if (!url || typeof url !== "string" || !url.trim()) {
+    return res.json({ online: false, error: "Silakan masukkan URL Colab / Ngrok." });
   }
 
   try {
-    const cleanUrl = url.trim().replace(/\/$/, "");
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    let cleanUrl = url.trim().replace(/\/$/, "");
+    if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+      cleanUrl = `https://${cleanUrl}`;
+    }
 
-    const response = await fetch(`${cleanUrl}/health`, {
-      method: "GET",
-      headers: {
-        "User-Agent": "AIVideoStudio-Client",
-        "ngrok-skip-browser-warning": "true",
-      },
-      signal: controller.signal,
-    });
+    // Check if user accidentally pasted colab.research.google.com URL
+    if (cleanUrl.includes("colab.research.google.com") || cleanUrl.includes("google.com/drive")) {
+      return res.json({
+        online: false,
+        error: "URL yang dimasukkan adalah link halaman web Google Colab, bukan URL Ngrok tunnel. Silakan jalankan cell Python di Google Colab, lalu salin URL publik yang dihasilkan (contoh: https://xxxx.ngrok-free.app).",
+      });
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const headers: Record<string, string> = {
+      "User-Agent": "curl/7.68.0",
+      "ngrok-skip-browser-warning": "69420",
+      "bypass-tunnel-reminder": "true",
+      "Accept": "application/json, text/plain, */*",
+    };
+
+    // Try /health first, then / as fallback
+    let response: any;
+    try {
+      response = await fetch(`${cleanUrl}/health`, {
+        method: "GET",
+        headers,
+        signal: controller.signal,
+      });
+    } catch (e: any) {
+      if (e.name === "AbortError") {
+        throw new Error("Koneksi timeout (10 detik). Server Colab belum aktif atau URL salah.");
+      }
+      // Try root /
+      response = await fetch(`${cleanUrl}/`, {
+        method: "GET",
+        headers,
+        signal: controller.signal,
+      });
+    }
     clearTimeout(timeoutId);
 
+    const rawText = await response.text();
+
+    // Check if response is HTML
+    if (
+      rawText.trim().startsWith("<") ||
+      rawText.includes("<!DOCTYPE") ||
+      rawText.includes("<!doctype") ||
+      rawText.includes("<html") ||
+      rawText.includes("<body")
+    ) {
+      if (rawText.includes("ngrok") || cleanUrl.includes("ngrok")) {
+        return res.json({
+          online: false,
+          error: "Ngrok mengembalikan halaman web peringatan HTML bukannya JSON. Pastikan cell script Python di Google Colab masih berstatus Running (sedang aktif).",
+        });
+      }
+      return res.json({
+        online: false,
+        error: "Server mengembalikan halaman web HTML bukannya data API JSON. Pastikan server Python di Colab sudah dijalankan (cell running) dan port 8000 sudah terbuka.",
+      });
+    }
+
+    let data: any = {};
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      return res.json({
+        online: false,
+        error: `Format respon dari server tidak valid (bukan JSON): ${rawText.slice(0, 120)}`,
+      });
+    }
+
     if (response.ok) {
-      const data = await response.json();
       return res.json({
         online: true,
         gpu: data.gpu || "NVIDIA GPU Detected",
@@ -383,14 +444,14 @@ app.post("/api/colab/test", async (req, res) => {
     } else {
       return res.json({
         online: false,
-        error: `Server Colab merespon dengan status HTTP ${response.status}`,
+        error: data.detail || data.error || `Server merespon dengan status HTTP ${response.status}`,
       });
     }
   } catch (err: any) {
     console.warn("Colab test connection error:", err.message);
     return res.json({
       online: false,
-      error: `Gagal menghubungi Colab: ${err.message || "Timeout / Offline"}`,
+      error: `Gagal menghubungi Colab: ${err.message || "Timeout / Server offline"}`,
     });
   }
 });
@@ -404,14 +465,20 @@ app.post("/api/colab/generate", async (req, res) => {
   }
 
   try {
-    const cleanUrl = colabUrl.trim().replace(/\/$/, "");
+    let cleanUrl = colabUrl.trim().replace(/\/$/, "");
+    if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+      cleanUrl = `https://${cleanUrl}`;
+    }
+
     console.log(`Forwarding video generation to Colab: ${cleanUrl}/generate`);
 
     const colabRes = await fetch(`${cleanUrl}/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
+        "User-Agent": "curl/7.68.0",
+        "ngrok-skip-browser-warning": "69420",
+        "bypass-tunnel-reminder": "true",
       },
       body: JSON.stringify({
         prompt,
@@ -423,7 +490,7 @@ app.post("/api/colab/generate", async (req, res) => {
 
     if (!colabRes.ok) {
       const errText = await colabRes.text();
-      return res.status(colabRes.status).json({ error: `Colab error: ${errText}` });
+      return res.status(colabRes.status).json({ error: `Colab error: ${errText.slice(0, 200)}` });
     }
 
     const contentType = colabRes.headers.get("content-type") || "video/mp4";

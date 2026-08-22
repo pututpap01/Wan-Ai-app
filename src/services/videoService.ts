@@ -58,12 +58,21 @@ export async function generateStoryboardScript(params: {
 }
 
 export async function testRapidApiConnection(apiKey: string): Promise<{ valid: boolean; message: string }> {
-  const res = await fetch("/api/rapidapi/test", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKey }),
-  });
-  return await res.json();
+  try {
+    const res = await fetch("/api/rapidapi/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey }),
+    });
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { valid: false, message: `Respon server tidak valid (${res.status})` };
+    }
+  } catch (err: any) {
+    return { valid: false, message: err.message || "Gagal menghubungkan ke RapidAPI proxy" };
+  }
 }
 
 export async function testColabConnection(colabUrl: string): Promise<{
@@ -73,12 +82,34 @@ export async function testColabConnection(colabUrl: string): Promise<{
   vram_gb?: number;
   error?: string;
 }> {
-  const res = await fetch("/api/colab/test", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: colabUrl }),
-  });
-  return await res.json();
+  try {
+    const res = await fetch("/api/colab/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: colabUrl }),
+    });
+
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch (parseErr) {
+      if (text.includes("<!DOCTYPE") || text.includes("<html") || text.includes("<!doctype")) {
+        return {
+          online: false,
+          error: "URL mengembalikan halaman HTML. Pastikan Anda memasukkan URL Ngrok dari Colab (https://xxxx.ngrok-free.app), bukan link browser Google Colab.",
+        };
+      }
+      return {
+        online: false,
+        error: `Respon tidak valid dari server: ${text.slice(0, 100)}`,
+      };
+    }
+  } catch (err: any) {
+    return {
+      online: false,
+      error: `Gagal menghubungi server backend: ${err.message}`,
+    };
+  }
 }
 
 export async function renderColabVideo(params: {
@@ -88,18 +119,29 @@ export async function renderColabVideo(params: {
   duration: number;
   guidanceScale?: number;
 }): Promise<{ success: boolean; videoBlobUrl?: string; error?: string }> {
-  const res = await fetch("/api/colab/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  });
+  try {
+    const res = await fetch("/api/colab/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Colab render failed" }));
-    return { success: false, error: err.error || "Gagal render video dari Colab" };
+    if (!res.ok) {
+      const errText = await res.text();
+      let msg = "Colab render failed";
+      try {
+        const json = JSON.parse(errText);
+        msg = json.error || msg;
+      } catch {
+        msg = errText.slice(0, 150) || `HTTP error ${res.status}`;
+      }
+      return { success: false, error: msg };
+    }
+
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    return { success: true, videoBlobUrl: blobUrl };
+  } catch (err: any) {
+    return { success: false, error: `Gagal request render: ${err.message}` };
   }
-
-  const blob = await res.blob();
-  const blobUrl = URL.createObjectURL(blob);
-  return { success: true, videoBlobUrl: blobUrl };
 }

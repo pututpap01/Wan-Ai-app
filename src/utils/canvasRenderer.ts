@@ -114,27 +114,36 @@ export class VideoRendererEngine {
     // 1. Base Background Gradient based on Style
     const grad = ctx.createLinearGradient(0, 0, width, height);
     if (config.style === "Cyberpunk Neon") {
-      grad.addColorStop(0, "#090d16");
-      grad.addColorStop(0.5, "#1e1b4b");
-      grad.addColorStop(1, "#31103f");
+      grad.addColorStop(0, "#030712");
+      grad.addColorStop(0.35, "#0b0f19");
+      grad.addColorStop(0.7, "#17102e");
+      grad.addColorStop(1, "#260d33");
     } else if (config.style === "Anime & Manga") {
-      grad.addColorStop(0, "#38bdf8");
-      grad.addColorStop(0.6, "#f472b6");
-      grad.addColorStop(1, "#fbbf24");
-    } else if (config.style === "FPV Drone Aerial") {
       grad.addColorStop(0, "#0284c7");
       grad.addColorStop(0.4, "#38bdf8");
-      grad.addColorStop(0.8, "#059669");
-      grad.addColorStop(1, "#047857");
+      grad.addColorStop(0.7, "#f472b6");
+      grad.addColorStop(1, "#fbbf24");
+    } else if (config.style === "FPV Drone Aerial") {
+      grad.addColorStop(0, "#0369a1");
+      grad.addColorStop(0.35, "#38bdf8");
+      grad.addColorStop(0.7, "#0d9488");
+      grad.addColorStop(1, "#064e3b");
     } else if (config.style === "Vintage 35mm Film") {
-      grad.addColorStop(0, "#78350f");
-      grad.addColorStop(0.5, "#92400e");
-      grad.addColorStop(1, "#1c1917");
+      grad.addColorStop(0, "#451a03");
+      grad.addColorStop(0.45, "#78350f");
+      grad.addColorStop(0.8, "#292524");
+      grad.addColorStop(1, "#0c0a09");
+    } else if (config.style === "Photorealistic") {
+      grad.addColorStop(0, "#090d16");
+      grad.addColorStop(0.4, "#131b2e");
+      grad.addColorStop(0.75, "#1f293d");
+      grad.addColorStop(1, "#0a0e17");
     } else {
-      // Cinematic / Default
-      grad.addColorStop(0, "#0b1120");
-      grad.addColorStop(0.5, "#172554");
-      grad.addColorStop(1, "#1e1b4b");
+      // Cinematic 8K
+      grad.addColorStop(0, "#020617");
+      grad.addColorStop(0.3, "#0f172a");
+      grad.addColorStop(0.65, "#1e1b4b");
+      grad.addColorStop(1, "#030712");
     }
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, width, height);
