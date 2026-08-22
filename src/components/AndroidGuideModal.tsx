@@ -135,11 +135,11 @@ jobs:
       - name: Build Web Application
         run: npm run build
 
-      - name: Setup Java JDK 17
+      - name: Setup Java JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
       - name: Setup Android SDK Environment
         uses: android-actions/setup-android@v3
