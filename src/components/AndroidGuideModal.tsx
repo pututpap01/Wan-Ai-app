@@ -122,14 +122,15 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 22
 
-      - name: Install NPM Dependencies
-        run: npm ci || npm install
+      - name: Install Dependencies
+        run: |
+          npm install --legacy-peer-deps
+          npm install -D @capacitor/cli @capacitor/core @capacitor/android
 
       - name: Build Web Application
         run: npm run build
@@ -143,7 +144,7 @@ jobs:
       - name: Setup Android SDK Environment
         uses: android-actions/setup-android@v3
 
-      - name: Sync Capacitor Android
+      - name: Sync Capacitor Android Platform
         run: |
           npx cap add android || true
           npx cap sync android
@@ -152,12 +153,12 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK as Release Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AI-Video-Studio-APK
+          name: AI-Video-Studio-Android-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14`;
 
