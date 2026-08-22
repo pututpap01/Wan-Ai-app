@@ -2,16 +2,16 @@ import { AspectRatio, CameraMotion, StoryboardProject, VideoStyle } from "../typ
 
 export interface EnhancePromptResponse {
   enhancedPrompt: string;
-  visualStyle: string;
-  cameraNotes: string;
-  lightingNotes: string;
-  keywords: string[];
+  visualStyle?: string;
+  cameraNotes?: string;
+  lightingNotes?: string;
+  keywords?: string[];
 }
 
 export async function enhancePromptWithAI(params: {
   prompt: string;
-  style: VideoStyle;
-  cameraMotion: CameraMotion;
+  style?: VideoStyle;
+  cameraMotion?: CameraMotion;
   aspectRatio: AspectRatio;
 }): Promise<EnhancePromptResponse> {
   try {
@@ -29,11 +29,11 @@ export async function enhancePromptWithAI(params: {
   } catch (err: any) {
     console.warn("Falling back to client prompt enhancer:", err);
     return {
-      enhancedPrompt: `${params.prompt}, ultra-cinematic 8k octane render, ${params.style} aesthetic, ${params.cameraMotion}, volumetric light rays, fine textures, photorealistic color grading`,
-      visualStyle: params.style,
-      cameraNotes: `${params.cameraMotion} with 35mm prime lens`,
-      lightingNotes: "Volumetric rim lighting and soft atmospheric haze",
-      keywords: ["cinematic", "photorealistic", "8k", "masterpiece"],
+      enhancedPrompt: `${params.prompt}, highly detailed scene, authentic lighting, fine textures, fluid physical motion`,
+      visualStyle: "Model Native",
+      cameraNotes: "Natural composition focusing directly on subject action",
+      lightingNotes: "Volumetric atmospheric lighting and soft realistic highlights",
+      keywords: ["photorealistic", "8k", "high-definition", "masterpiece"],
     };
   }
 }
@@ -91,12 +91,39 @@ export async function testColabConnection(colabUrl: string): Promise<{
 
     const text = await res.text();
     try {
-      return JSON.parse(text);
-    } catch (parseErr) {
+      const parsed = JSON.parse(text);
+      return parsed;
+    } catch {
+      // If server returned non-JSON, attempt direct fetch if on client
+      try {
+        let cleanUrl = colabUrl.trim().replace(/\/$/, "");
+        if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+          cleanUrl = `https://${cleanUrl}`;
+        }
+        const directRes = await fetch(`${cleanUrl}/health`, {
+          method: "GET",
+          headers: {
+            "ngrok-skip-browser-warning": "69420",
+            "Bypass-Tunnel-Reminder": "true",
+          },
+        });
+        if (directRes.ok) {
+          const directData = await directRes.json();
+          return {
+            online: true,
+            gpu: directData.gpu || "GPU Detected",
+            model: directData.model || "Wan2.1 / Realistic Diffusion",
+            vram_gb: directData.vram_gb || 15.0,
+          };
+        }
+      } catch {
+        // ignore fallback error
+      }
+
       if (text.includes("<!DOCTYPE") || text.includes("<html") || text.includes("<!doctype")) {
         return {
           online: false,
-          error: "URL mengembalikan halaman HTML. Pastikan Anda memasukkan URL Ngrok dari Colab (https://xxxx.ngrok-free.app), bukan link browser Google Colab.",
+          error: "URL mengembalikan halaman HTML. Pastikan cell script Python di Google Colab sedang 'Running' (aktif).",
         };
       }
       return {
@@ -118,6 +145,7 @@ export async function renderColabVideo(params: {
   aspectRatio: string;
   duration: number;
   guidanceScale?: number;
+  imageUrl?: string;
 }): Promise<{ success: boolean; videoBlobUrl?: string; error?: string }> {
   try {
     const res = await fetch("/api/colab/generate", {

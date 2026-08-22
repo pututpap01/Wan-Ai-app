@@ -65,9 +65,9 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// 2. Enhance Prompt with Gemini AI (Cinematography, Lighting, Camera Directives)
+// 2. Enhance Prompt with Gemini AI
 app.post("/api/prompt/enhance", async (req, res) => {
-  const { prompt, style, cameraMotion, aspectRatio } = req.body;
+  const { prompt, aspectRatio } = req.body;
 
   if (!prompt || typeof prompt !== "string") {
     return res.status(400).json({ error: "Prompt is required" });
@@ -77,33 +77,28 @@ app.post("/api/prompt/enhance", async (req, res) => {
     const ai = getGenAI();
     if (!ai) {
       // Fallback enhancement if API key is not yet configured
-      const fallbackEnhanced = `${prompt}, ${style || "cinematic"} style, dynamic ${
-        cameraMotion || "cinematic camera movement"
-      }, 8k resolution, ultra-detailed textures, photorealistic cinematic lighting, volumetric atmosphere, octane render quality, ${
+      const fallbackEnhanced = `${prompt}, high resolution, ultra-detailed textures, authentic natural lighting, volumetric atmosphere, fine detail fidelity, ${
         aspectRatio === "9:16" ? "vertical portrait framing" : "wide angle 16:9 composition"
       }`;
       return res.json({
         enhancedPrompt: fallbackEnhanced,
-        keywords: ["cinematic", "photorealistic", "volumetric light", "8k"],
-        cameraNotes: `Smooth ${cameraMotion || "camera push-in"} with 35mm focal lens depth of field`,
+        keywords: ["photorealistic", "volumetric light", "high-definition", "8k"],
         lightingNotes: "Natural volumetric rim light and subtle color grading",
       });
     }
 
-    const systemInstruction = `You are an elite Hollywood cinematographer and AI Video Prompt Engineer specializing in Runway Gen-3, Sora, and Veo video generation models.
-Transform the user's basic concept into a masterclass video generation prompt with specific visual cues:
-1. Exact visual subject details & actions
-2. Camera movement (lens focal length, pan/tilt/zoom/orbit/tracking speed)
-3. Atmospheric lighting & color grading (e.g., golden hour, neon noir, anamorphic lens flares)
-4. Motion dynamics & particle effects (e.g., wind blowing, rain droplets, dust motes)
+    const systemInstruction = `You are an elite AI Video Prompt Engineer specializing in Wan2.1, Runway Gen-3, Sora, and Veo video diffusion models.
+Transform the user's prompt into an ultra-high quality, photorealistic video prompt that faithfully expands on the user's scene, subjects, physics, lighting, and textures without adding forced camera movements or artificial style filters:
+1. Exact visual subject details & actions faithful to the user's prompt
+2. Organic motion dynamics & physical interactions (wind blowing, fluid ripples, clothing physics)
+3. Atmospheric lighting & color grading (e.g., golden hour, neon noir, warm morning sunlight)
+4. Micro-details, authentic textures, and depth
 Provide the output in strict JSON.`;
 
-    const userQuery = `Original Idea: "${prompt}"
-Desired Style: ${style || "Cinematic"}
-Camera Motion: ${cameraMotion || "Dynamic"}
+    const userQuery = `User Prompt: "${prompt}"
 Aspect Ratio: ${aspectRatio || "16:9"}
 
-Generate an enhanced cinematic video prompt and cinematography guidance.`;
+Generate an enhanced video prompt focusing purely on the subjects, setting, physics, and lighting.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3.7-flash",
@@ -116,15 +111,11 @@ Generate an enhanced cinematic video prompt and cinematography guidance.`;
           properties: {
             enhancedPrompt: {
               type: Type.STRING,
-              description: "The complete, rich AI video generation prompt.",
+              description: "The complete, rich AI video generation prompt faithfully reflecting the user's scene.",
             },
             visualStyle: {
               type: Type.STRING,
-              description: "Short description of the color palette and art direction.",
-            },
-            cameraNotes: {
-              type: Type.STRING,
-              description: "Directorial camera movement and lens specifications.",
+              description: "Short description of the color palette and atmosphere.",
             },
             lightingNotes: {
               type: Type.STRING,
@@ -136,7 +127,7 @@ Generate an enhanced cinematic video prompt and cinematography guidance.`;
               description: "5-7 key descriptive tags.",
             },
           },
-          required: ["enhancedPrompt", "visualStyle", "cameraNotes", "lightingNotes", "keywords"],
+          required: ["enhancedPrompt", "visualStyle", "lightingNotes", "keywords"],
         },
       },
     });
@@ -146,11 +137,10 @@ Generate an enhanced cinematic video prompt and cinematography guidance.`;
   } catch (error: any) {
     console.error("Prompt enhance error:", error);
     res.json({
-      enhancedPrompt: `${prompt}, ${style || "cinematic"} style, highly detailed cinematography, 8k resolution, ${cameraMotion || "smooth camera movement"}`,
-      visualStyle: style || "Cinematic Realism",
-      cameraNotes: `Smooth ${cameraMotion || "cinematic"} motion`,
+      enhancedPrompt: `${prompt}, highly detailed scene, 8k resolution, photorealistic cinematic lighting`,
+      visualStyle: "Model Native",
       lightingNotes: "Cinematic mood lighting with subtle highlights",
-      keywords: ["cinematic", "high-resolution", "photorealistic", "ambient"],
+      keywords: ["high-resolution", "photorealistic", "ambient"],
     });
   }
 });
@@ -375,53 +365,58 @@ app.post("/api/colab/test", async (req, res) => {
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const headers: Record<string, string> = {
-      "User-Agent": "curl/7.68.0",
+      "User-Agent": "curl/7.88.1",
       "ngrok-skip-browser-warning": "69420",
+      "Ngrok-Skip-Browser-Warning": "true",
       "bypass-tunnel-reminder": "true",
-      "Accept": "application/json, text/plain, */*",
+      "Bypass-Tunnel-Reminder": "true",
+      "Accept": "*/*",
     };
 
     // Try /health first, then / as fallback
     let response: any;
+    let rawText = "";
     try {
       response = await fetch(`${cleanUrl}/health`, {
         method: "GET",
         headers,
         signal: controller.signal,
       });
+      rawText = await response.text();
     } catch (e: any) {
       if (e.name === "AbortError") {
         throw new Error("Koneksi timeout (10 detik). Server Colab belum aktif atau URL salah.");
       }
-      // Try root /
-      response = await fetch(`${cleanUrl}/`, {
-        method: "GET",
-        headers,
-        signal: controller.signal,
-      });
+      try {
+        // Try root /
+        response = await fetch(`${cleanUrl}/`, {
+          method: "GET",
+          headers,
+          signal: controller.signal,
+        });
+        rawText = await response.text();
+      } catch (rootErr: any) {
+        throw new Error(`Tidak dapat terhubung ke ${cleanUrl}: ${rootErr.message}`);
+      }
     }
     clearTimeout(timeoutId);
 
-    const rawText = await response.text();
-
-    // Check if response is HTML
+    // If still getting Ngrok interstitial warning HTML, try POST /health or extract status
     if (
-      rawText.trim().startsWith("<") ||
-      rawText.includes("<!DOCTYPE") ||
-      rawText.includes("<!doctype") ||
-      rawText.includes("<html") ||
-      rawText.includes("<body")
+      (rawText.trim().startsWith("<") ||
+        rawText.includes("<!DOCTYPE") ||
+        rawText.includes("<!doctype") ||
+        rawText.includes("<html") ||
+        rawText.includes("<body")) &&
+      (rawText.includes("ngrok") || rawText.includes("ERR_NGROK") || cleanUrl.includes("ngrok"))
     ) {
-      if (rawText.includes("ngrok") || cleanUrl.includes("ngrok")) {
+      // Check if it's ERR_NGROK_3200 (offline) vs warning page
+      if (rawText.includes("ERR_NGROK_3200") || rawText.includes("Tunnel") && rawText.includes("not found")) {
         return res.json({
           online: false,
-          error: "Ngrok mengembalikan halaman web peringatan HTML bukannya JSON. Pastikan cell script Python di Google Colab masih berstatus Running (sedang aktif).",
+          error: "Tunnel Ngrok tidak aktif (ERR_NGROK_3200). Pastikan cell script Python di Google Colab sedang 'Running' dan tidak berhenti.",
         });
       }
-      return res.json({
-        online: false,
-        error: "Server mengembalikan halaman web HTML bukannya data API JSON. Pastikan server Python di Colab sudah dijalankan (cell running) dan port 8000 sudah terbuka.",
-      });
     }
 
     let data: any = {};
@@ -458,7 +453,7 @@ app.post("/api/colab/test", async (req, res) => {
 
 // 8. Colab Tunnel Proxy Video Generation
 app.post("/api/colab/generate", async (req, res) => {
-  const { colabUrl, prompt, aspectRatio = "9:16", duration = 5, guidanceScale = 6.0 } = req.body;
+  const { colabUrl, prompt, aspectRatio = "9:16", duration = 5, guidanceScale = 6.0, imageUrl, image } = req.body;
 
   if (!colabUrl) {
     return res.status(400).json({ error: "Colab URL is required" });
@@ -470,7 +465,7 @@ app.post("/api/colab/generate", async (req, res) => {
       cleanUrl = `https://${cleanUrl}`;
     }
 
-    console.log(`Forwarding video generation to Colab: ${cleanUrl}/generate`);
+    console.log(`Forwarding video generation to Colab: ${cleanUrl}/generate (Image-to-Video: ${Boolean(imageUrl || image)})`);
 
     const colabRes = await fetch(`${cleanUrl}/generate`, {
       method: "POST",
@@ -481,10 +476,11 @@ app.post("/api/colab/generate", async (req, res) => {
         "bypass-tunnel-reminder": "true",
       },
       body: JSON.stringify({
-        prompt,
+        prompt: prompt || "",
         aspect_ratio: aspectRatio,
         duration: Number(duration),
         guidance_scale: Number(guidanceScale),
+        image: imageUrl || image || null,
       }),
     });
 

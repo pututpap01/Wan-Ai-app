@@ -57,7 +57,6 @@ export default function App() {
       prompt: "Futuristic neon-lit street in Tokyo at midnight, heavy rain with reflections on asphalt, flying holographic vehicles zooming past, moody atmosphere",
       enhancedPrompt: "Futuristic neon-lit street in Tokyo at midnight, volumetric heavy rain with reflections on asphalt, anamorphic blue and magenta lens flares, flying holographic vehicles zooming past, 8k cinematic masterpiece",
       style: "Cyberpunk Neon",
-      cameraMotion: "Slow Push-In (Zoom In)",
       aspectRatio: "9:16",
       duration: 6,
       fps: 30,
@@ -65,7 +64,6 @@ export default function App() {
       createdAt: Date.now(),
       status: "completed",
       progress: 100,
-      cameraNotes: "Slow Push-In with 35mm f/1.4 lens depth of field",
       lightingNotes: "Vibrant high-contrast neon lighting with asphalt reflections",
       keywords: ["cyberpunk", "tokyo", "neon", "rain", "cinematic"],
     };
@@ -88,8 +86,8 @@ export default function App() {
   const handleGenerateVideo = async (config: {
     prompt: string;
     enhancedPrompt?: string;
-    style: VideoStyle;
-    cameraMotion: CameraMotion;
+    style?: VideoStyle;
+    cameraMotion?: CameraMotion;
     aspectRatio: AspectRatio;
     duration: number;
     motionIntensity: number;
@@ -139,6 +137,7 @@ export default function App() {
           aspectRatio: config.aspectRatio,
           duration: config.duration,
           guidanceScale: 6.0,
+          imageUrl: config.imageUrl,
         });
 
         clearInterval(interval);
@@ -215,7 +214,7 @@ export default function App() {
   // Multi-Scene Storyboard Batch Render Handler
   const handleBatchStoryboardGenerate = async (
     scenes: SceneScript[],
-    style: VideoStyle,
+    style: VideoStyle | undefined,
     topic: string
   ) => {
     setIsGenerating(true);

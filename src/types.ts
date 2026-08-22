@@ -43,8 +43,8 @@ export interface VideoProject {
   title: string;
   prompt: string;
   enhancedPrompt?: string;
-  style: VideoStyle;
-  cameraMotion: CameraMotion;
+  style?: VideoStyle;
+  cameraMotion?: CameraMotion;
   aspectRatio: AspectRatio;
   duration: number; // in seconds (e.g. 4, 6, 8, 12, 16)
   fps: number;
@@ -75,8 +75,8 @@ export interface PresetIdea {
   title: string;
   category: "Nature" | "Cyberpunk" | "Anime" | "Cinematic" | "Abstract" | "Drone";
   prompt: string;
-  style: VideoStyle;
-  cameraMotion: CameraMotion;
+  style?: VideoStyle;
+  cameraMotion?: CameraMotion;
   aspectRatio: AspectRatio;
   duration: number;
   motionIntensity: number;

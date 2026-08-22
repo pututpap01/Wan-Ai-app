@@ -4,28 +4,23 @@ import {
   Wand2,
   Video,
   Image as ImageIcon,
-  Camera,
   Play,
   Sliders,
-  Check,
   RefreshCw,
   Film,
-  Zap,
-  Info,
   Clock,
-  Layers,
   Upload,
 } from "lucide-react";
-import { AspectRatio, CameraMotion, VideoProject, VideoStyle } from "../types";
-import { CAMERA_MOTIONS, PRESET_TEMPLATES, VIDEO_STYLES } from "../data/presets";
+import { AspectRatio, CameraMotion, VideoStyle } from "../types";
+import { PRESET_TEMPLATES } from "../data/presets";
 import { enhancePromptWithAI } from "../services/videoService";
 
 interface VideoGeneratorFormProps {
   onGenerate: (config: {
     prompt: string;
     enhancedPrompt?: string;
-    style: VideoStyle;
-    cameraMotion: CameraMotion;
+    style?: VideoStyle;
+    cameraMotion?: CameraMotion;
     aspectRatio: AspectRatio;
     duration: number;
     motionIntensity: number;
@@ -56,8 +51,6 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
   const [prompt, setPrompt] = useState<string>(
     "A neon-lit cyberpunk alleyway in Tokyo at midnight during rain, reflections on asphalt, flying car passing by"
   );
-  const [style, setStyle] = useState<VideoStyle>("Cyberpunk Neon");
-  const [cameraMotion, setCameraMotion] = useState<CameraMotion>("Slow Push-In (Zoom In)");
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("9:16");
   const [duration, setDuration] = useState<number>(6);
   const [motionIntensity, setMotionIntensity] = useState<number>(7);
@@ -68,7 +61,6 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
   const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
   const [enhancedData, setEnhancedData] = useState<{
     enhancedPrompt?: string;
-    cameraNotes?: string;
     lightingNotes?: string;
     keywords?: string[];
   } | null>(null);
@@ -80,8 +72,6 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
     const preset = PRESET_TEMPLATES.find((p) => p.id === presetId);
     if (!preset) return;
     setPrompt(preset.prompt);
-    setStyle(preset.style);
-    setCameraMotion(preset.cameraMotion);
     setAspectRatio(preset.aspectRatio);
     setDuration(preset.duration);
     setMotionIntensity(preset.motionIntensity);
@@ -95,13 +85,10 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
     try {
       const res = await enhancePromptWithAI({
         prompt,
-        style,
-        cameraMotion,
         aspectRatio,
       });
       setEnhancedData({
         enhancedPrompt: res.enhancedPrompt,
-        cameraNotes: res.cameraNotes,
         lightingNotes: res.lightingNotes,
         keywords: res.keywords,
       });
@@ -136,13 +123,10 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
     await onGenerate({
       prompt,
       enhancedPrompt: enhancedData?.enhancedPrompt,
-      style,
-      cameraMotion,
       aspectRatio,
       duration,
       motionIntensity,
       imageUrl: mode === "image" ? imageUrl : undefined,
-      cameraNotes: enhancedData?.cameraNotes,
       lightingNotes: enhancedData?.lightingNotes,
       keywords: enhancedData?.keywords,
     });
@@ -184,7 +168,7 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
 
         <div className="hidden sm:flex items-center gap-1 text-[11px] text-slate-400">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>Engine: Runway & Veo Ready</span>
+          <span>Engine: Wan2.1 & Photorealistic Ready</span>
         </div>
       </div>
 
@@ -275,7 +259,7 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
           <div className="flex items-center justify-between">
             <label htmlFor="video-prompt-input" className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
               <Film className="w-3.5 h-3.5 text-sky-400" />
-              <span>{mode === "text" ? "Video Prompt & Scene Idea" : "Motion & Camera Instructions"}</span>
+              <span>{mode === "text" ? "Video Prompt & Scene Idea" : "Subject Motion & Scene Action"}</span>
             </label>
 
             {/* AI Magic Enhance Button */}
@@ -287,7 +271,7 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
               className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 text-xs font-medium transition-all disabled:opacity-50"
             >
               <Wand2 className={`w-3 h-3 ${isEnhancing ? "animate-spin" : ""}`} />
-              <span>{isEnhancing ? "Enhancing Cinematography..." : "AI Magic Enhance"}</span>
+              <span>{isEnhancing ? "Enhancing Prompt..." : "AI Magic Enhance"}</span>
             </button>
           </div>
 
@@ -302,7 +286,7 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
             placeholder={
               mode === "text"
                 ? "Describe your scene in detail (e.g., An astronaut walking on a crystalline alien planet with purple aurora borealis in the sky...)"
-                : "Describe camera motion and animation (e.g., Slow zoom into subject's eyes with cinematic light flare...)"
+                : "Describe subject motion and physics (e.g., Natural facial smile, flowing hair in gentle breeze, warm cinematic light...)"
             }
             className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-xl p-3.5 text-sm text-slate-100 placeholder-slate-500 outline-none resize-none transition-colors"
           />
@@ -313,82 +297,22 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
               <div className="flex items-center justify-between text-amber-300 font-semibold">
                 <span className="flex items-center gap-1">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  Enhanced Hollywood Cinematography Prompt
+                  Enhanced Video Prompt
                 </span>
                 <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full">Gemini 3.7</span>
               </div>
               <p className="text-slate-200 leading-relaxed italic">"{enhancedData.enhancedPrompt}"</p>
-              {enhancedData.cameraNotes && (
-                <p className="text-[11px] text-amber-200/80">
-                  <strong>Camera:</strong> {enhancedData.cameraNotes}
-                </p>
-              )}
               {enhancedData.lightingNotes && (
                 <p className="text-[11px] text-amber-200/80">
-                  <strong>Lighting:</strong> {enhancedData.lightingNotes}
+                  <strong>Atmosphere & Lighting:</strong> {enhancedData.lightingNotes}
                 </p>
               )}
             </div>
           )}
         </div>
 
-        {/* Visual Styles Grid */}
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5 text-indigo-400" />
-              Visual Art Style
-            </span>
-            <span className="text-sky-400 text-xs font-medium">{style}</span>
-          </label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {VIDEO_STYLES.map((st) => {
-              const isSelected = style === st.id;
-              return (
-                <button
-                  key={st.id}
-                  type="button"
-                  id={`style-btn-${st.id.replace(/\s+/g, "-")}`}
-                  onClick={() => setStyle(st.id as VideoStyle)}
-                  className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all ${
-                    isSelected
-                      ? "bg-sky-950/60 border-sky-500 text-white shadow-sm ring-1 ring-sky-500/50"
-                      : "bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700"
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full mb-1">
-                    <span className="text-xs font-semibold truncate">{st.name}</span>
-                    {isSelected && <Check className="w-3.5 h-3.5 text-sky-400" />}
-                  </div>
-                  <span className="text-[10px] text-slate-500 line-clamp-1">{st.desc}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Camera Motion & Aspect Ratio & Duration */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-          {/* Camera Motion */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
-              Camera Movement
-            </label>
-            <select
-              id="camera-motion-select"
-              value={cameraMotion}
-              onChange={(e) => setCameraMotion(e.target.value as CameraMotion)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:border-sky-500 outline-none"
-            >
-              {CAMERA_MOTIONS.map((cm) => (
-                <option key={cm.id} value={cm.id}>
-                  {cm.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
+        {/* Aspect Ratio & Duration */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
           {/* Aspect Ratio */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
@@ -429,7 +353,7 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
             </div>
           </div>
 
-          {/* Duration & Motion Intensity */}
+          {/* Duration */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
               <span className="flex items-center gap-1">
@@ -461,7 +385,7 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
         {/* Motion Intensity Slider */}
         <div className="space-y-1.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-slate-300">Motion Dynamic Intensity</span>
+            <span className="font-semibold text-slate-300">Prompt Motion Dynamics</span>
             <span className="text-sky-400 font-bold">Level {motionIntensity} / 10</span>
           </div>
           <input
@@ -474,9 +398,9 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
             className="w-full accent-sky-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
           />
           <div className="flex justify-between text-[10px] text-slate-500">
-            <span>Subtle Cinematic</span>
-            <span>Balanced Realism</span>
-            <span>High Dynamic Action</span>
+            <span>Subtle Fluidity</span>
+            <span>Natural Physical Motion</span>
+            <span>Dynamic High Action</span>
           </div>
         </div>
 
@@ -523,7 +447,7 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
               <RefreshCw className="w-4 h-4 animate-spin" />
               <span>
                 {colabConfig?.isConnected
-                  ? `GPU Colab Rendering Wan2.2 Video (${generationProgress}%)...`
+                  ? `GPU Colab Rendering Video (${generationProgress}%)...`
                   : `Generating AI Video (${generationProgress}%)...`}
               </span>
             </>
@@ -532,7 +456,7 @@ export const VideoGeneratorForm: React.FC<VideoGeneratorFormProps> = ({
               <Play className={`w-4 h-4 ${colabConfig?.isConnected ? "fill-slate-950" : "fill-white"}`} />
               <span>
                 {colabConfig?.isConnected
-                  ? `Render dengan Wan2.2 Colab (${duration}s • ${aspectRatio})`
+                  ? `Render dengan GPU Colab (${duration}s • ${aspectRatio})`
                   : `Generate AI Video (${duration}s • ${aspectRatio})`}
               </span>
             </>

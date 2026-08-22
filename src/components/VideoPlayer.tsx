@@ -298,7 +298,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </div>
             <p className="text-xs font-medium text-slate-300">No video generated yet</p>
             <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
-              Choose a prompt or preset on the left, customize camera movement, and hit "Generate AI Video".
+              Describe your scene in the prompt, choose your visual style, and hit "Generate AI Video".
             </p>
           </div>
         )}
@@ -357,7 +357,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   ? "bg-indigo-950 border-indigo-700 text-indigo-300"
                   : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
               }`}
-              title="View Cinematography Metadata"
+              title="View Video Metadata"
             >
               <Info className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Specs</span>
@@ -392,7 +392,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <div className="flex items-center justify-between text-slate-300 font-bold">
                 <span className="flex items-center gap-1.5">
                   <Camera className="w-3.5 h-3.5 text-sky-400" />
-                  Cinematography Metadata & Directives
+                  Video Details & Generation Specs
                 </span>
                 <span className="text-[10px] text-slate-500 font-mono">ID: {currentProject.id}</span>
               </div>
@@ -406,11 +406,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
               <div className="grid grid-cols-2 gap-2 text-[11px]">
                 <div className="bg-slate-900/60 p-2 rounded-lg border border-slate-800">
-                  <span className="text-slate-400 block font-semibold">Camera Direction:</span>
-                  <span className="text-sky-300">{currentProject.cameraMotion}</span>
+                  <span className="text-slate-400 block font-semibold">Generation Mode:</span>
+                  <span className="text-sky-300">
+                    {currentProject.imageUrl ? "Image-to-Video (Direct)" : "Text-to-Video"}
+                  </span>
                 </div>
                 <div className="bg-slate-900/60 p-2 rounded-lg border border-slate-800">
-                  <span className="text-slate-400 block font-semibold">Motion Intensity:</span>
+                  <span className="text-slate-400 block font-semibold">Motion Dynamics:</span>
                   <span className="text-amber-300">{currentProject.motionIntensity} / 10</span>
                 </div>
               </div>

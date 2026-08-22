@@ -16,7 +16,7 @@ import { SceneScript, StoryboardProject, VideoStyle } from "../types";
 import { generateStoryboardScript } from "../services/videoService";
 
 interface StoryboardCreatorProps {
-  onBatchGenerate: (scenes: SceneScript[], style: VideoStyle, topic: string) => Promise<void>;
+  onBatchGenerate: (scenes: SceneScript[], style: VideoStyle | undefined, topic: string) => Promise<void>;
   isGenerating: boolean;
 }
 
@@ -27,7 +27,6 @@ export const StoryboardCreator: React.FC<StoryboardCreatorProps> = ({
   const [topic, setTopic] = useState<string>("5 Mind-Blowing Facts About Deep Ocean Creatures");
   const [targetDuration, setTargetDuration] = useState<number>(15);
   const [platform, setPlatform] = useState<string>("tiktok/shorts");
-  const [style, setStyle] = useState<VideoStyle>("Cinematic");
   const [isScriptLoading, setIsScriptLoading] = useState<boolean>(false);
   const [storyboard, setStoryboard] = useState<StoryboardProject | null>({
     title: "Deep Ocean Secrets",
@@ -166,21 +165,7 @@ export const StoryboardCreator: React.FC<StoryboardCreatorProps> = ({
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-semibold">Visual Style:</span>
-            <select
-              value={style}
-              onChange={(e) => setStyle(e.target.value as VideoStyle)}
-              className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:border-indigo-500 outline-none"
-            >
-              <option value="Cinematic">Cinematic 8K</option>
-              <option value="Cyberpunk Neon">Cyberpunk Neon</option>
-              <option value="Anime & Manga">Anime Makoto</option>
-              <option value="Photorealistic">Photorealistic</option>
-              <option value="3D Pixar Animation">3D Animation</option>
-              <option value="Vintage 35mm Film">Vintage Film</option>
-            </select>
-          </div>
+          <span className="text-xs text-slate-400">Natural scene progression powered by Gemini 3.7</span>
 
           <button
             type="button"
@@ -262,7 +247,7 @@ export const StoryboardCreator: React.FC<StoryboardCreatorProps> = ({
           {/* Render All Scenes Button */}
           <div className="pt-2">
             <button
-              onClick={() => onBatchGenerate(storyboard.scenes, style, topic)}
+              onClick={() => onBatchGenerate(storyboard.scenes, undefined, topic)}
               disabled={isGenerating}
               className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-500 via-sky-500 to-cyan-400 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 shadow-xl shadow-indigo-950 hover:opacity-95 transition-all disabled:opacity-50"
             >

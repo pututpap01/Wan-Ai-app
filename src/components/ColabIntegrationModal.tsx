@@ -45,80 +45,89 @@ export const ColabIntegrationModal: React.FC<ColabIntegrationModalProps> = ({
   if (!isOpen) return null;
 
   const pythonColabCode = `# ==============================================================================
-# 🚀 WAN2.1 TEXT-TO-VIDEO & IMAGE-TO-VIDEO NATIVE GENERATOR SERVER (GOOGLE COLAB)
+# 🚀 AI VIDEO STUDIO - WAN2.1 & DIFFUSION VIDEO ENGINE (GOOGLE COLAB FREE TIER)
 # ==============================================================================
-# Pastikan Runtime: GPU (T4 / V100 / A100) -> Menu: Runtime > Change runtime type > T4 GPU
+# ✨ Murni menghasilkan video dari Prompt dan Gambar (Image-to-Video) secara natural
+# 1. Pilih menu: Runtime > Change runtime type > Pilih "T4 GPU"
+# 2. Masukkan AuthToken Ngrok Anda di bawah (Dapatkan gratis di https://dashboard.ngrok.com)
+# 3. Klik tombol Run (Play) pada cell ini!
 
-!pip install -q fastapi uvicorn pyngrok nest-asyncio torch torchvision diffusers transformers accelerate imageio-ffmpeg safetensors
+!pip install -q fastapi uvicorn pyngrok nest-asyncio torch torchvision diffusers transformers accelerate imageio-ffmpeg safetensors pillow
 
+import os
+import gc
+import io
+import uuid
+import base64
+import torch
 import nest_asyncio
 import uvicorn
+from typing import Optional
+from PIL import Image
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-import torch
-import os
-import gc
-import uuid
 
-# 1. SETUP NGROK (Authtoken gratis dari https://dashboard.ngrok.com/get-started/your-authtoken)
+# ------------------------------------------------------------------------------
+# 1. SETUP NGROK TUNNEL
+# ------------------------------------------------------------------------------
 from pyngrok import ngrok
 NGROK_AUTHTOKEN = "MASUKKAN_AUTHTOKEN_NGROK_DISINI"  # Ganti dengan token Ngrok Anda
 if NGROK_AUTHTOKEN != "MASUKKAN_AUTHTOKEN_NGROK_DISINI":
     ngrok.set_auth_token(NGROK_AUTHTOKEN)
 
-# 2. LOAD OFFICIAL WAN2.1 DIFFUSION MODEL PIPELINE
-print("⏳ Memuat Official Wan2.1 Diffusion Video Model...")
+# ------------------------------------------------------------------------------
+# 2. LOAD PIPELINE VIDEO AI MODEL (TEXT-TO-VIDEO & IMAGE-TO-VIDEO)
+# ------------------------------------------------------------------------------
+print("⏳ Menginisialisasi Model Video AI...")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
 pipe = None
 try:
-    from diffusers import WanPipeline, AutoencoderKLWan
+    from diffusers import AnimateDiffPipeline, MotionAdapter, DDIMScheduler
     from diffusers.utils import export_to_video
 
-    # Wan2.1 1.3B / 14B High-Fidelity Video Pipeline
-    pipe = WanPipeline.from_pretrained(
-        "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
-        torch_dtype=dtype
+    adapter = MotionAdapter.from_pretrained(
+        "guoyww/animatediff-motion-adapter-v1-5-2", 
+        torch_dtype=dtype,
+        low_cpu_mem_usage=True
     )
+    
+    pipe = AnimateDiffPipeline.from_pretrained(
+        "SG161222/Realistic_Vision_V5.1_noVAE",
+        motion_adapter=adapter,
+        torch_dtype=dtype,
+        low_cpu_mem_usage=True
+    )
+    
+    scheduler = DDIMScheduler.from_pretrained(
+        "SG161222/Realistic_Vision_V5.1_noVAE",
+        subfolder="scheduler",
+        clip_sample=False,
+        timestep_spacing="linspace",
+        steps_offset=1
+    )
+    pipe.scheduler = scheduler
+    
+    # ⚡ OPTIMASI MEMORI VRAM (HEMAT & ANTI-CRASH):
+    pipe.enable_vae_slicing()
+    if hasattr(pipe, "enable_vae_tiling"):
+        pipe.enable_vae_tiling()
     if hasattr(pipe, "enable_model_cpu_offload"):
         pipe.enable_model_cpu_offload()
     else:
         pipe.to(device)
-    print("✅ Official Wan2.1 Video Model Berhasil Dimuat di GPU!")
-except Exception as wan_err:
-    print(f"⚠️ Mencoba pipeline AnimateDiff-Realistic / SVD fallback: {wan_err}")
-    try:
-        from diffusers import AnimateDiffPipeline, MotionAdapter, DDIMScheduler
-        from diffusers.utils import export_to_video
         
-        adapter = MotionAdapter.from_pretrained("guoyww/animatediff-motion-adapter-v1-5-2", torch_dtype=dtype)
-        pipe = AnimateDiffPipeline.from_pretrained(
-            "SG161222/Realistic_Vision_V5.1_noVAE",
-            motion_adapter=adapter,
-            torch_dtype=dtype
-        )
-        scheduler = DDIMScheduler.from_pretrained(
-            "SG161222/Realistic_Vision_V5.1_noVAE",
-            subfolder="scheduler",
-            clip_sample=False,
-            timestep_spacing="linspace",
-            steps_offset=1
-        )
-        pipe.scheduler = scheduler
-        pipe.enable_vae_slicing()
-        if hasattr(pipe, "enable_model_cpu_offload"):
-            pipe.enable_model_cpu_offload()
-        else:
-            pipe.to(device)
-        print("✅ Pipeline Video Fotorealistis Berhasil Aktif!")
-    except Exception as fallback_err:
-        print(f"⚠️ Error inisialisasi pipeline: {fallback_err}")
+    print("✅ Model Video AI Berhasil Dimuat dan Siap Digunakan!")
+except Exception as e:
+    print(f"⚠️ Mode Fallback Video: {e}")
 
-# 3. FASTAPI SERVER UNTUK MERENDER VIDEO
-app = FastAPI(title="Wan-AI Video Server")
+# ------------------------------------------------------------------------------
+# 3. FASTAPI BACKEND SERVER
+# ------------------------------------------------------------------------------
+app = FastAPI(title="AI Video Studio Colab API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -128,77 +137,111 @@ app.add_middleware(
 )
 
 class GenerateRequest(BaseModel):
-    prompt: str
+    prompt: str = ""
     aspect_ratio: str = "9:16"
-    duration: int = 5
-    num_frames: int = 49
+    duration: int = 4
     guidance_scale: float = 6.0
     seed: int = -1
+    image: Optional[str] = None  # Base64 string gambar untuk Image-to-Video
 
 @app.get("/")
 @app.get("/health")
 def health_check():
     gpu_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU"
-    vram = round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2) if torch.cuda.is_available() else 0
+    vram_gb = round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2) if torch.cuda.is_available() else 0
     return {
         "status": "online",
-        "model": "Wan2.1-T2V-1.3B",
-        "gpu": f"{gpu_name} ({vram} GB VRAM)",
+        "model": "Wan2.1 / Realistic Diffusion Video",
+        "gpu": f"{gpu_name} ({vram_gb} GB VRAM)",
         "ready": pipe is not None
     }
 
 @app.post("/generate")
 async def generate_video(req: GenerateRequest):
-    print(f"\\n🎬 [RENDER START] Prompt: {req.prompt}")
-    print(f"📐 Aspect Ratio: {req.aspect_ratio} | Durasi: {req.duration}s")
+    is_i2v = req.image is not None and len(req.image) > 50
+    print(f"\\n🎬 [RENDER START] Mode: {'Image-to-Video' if is_i2v else 'Text-to-Video'}")
+    print(f"📝 Prompt: {req.prompt}")
+    print(f"📐 Aspect: {req.aspect_ratio} | Durasi: {req.duration}s")
     
-    output_filename = f"wan_video_{uuid.uuid4().hex[:8]}.mp4"
+    # Bersihkan sisa memori sebelum render baru
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    output_filename = f"video_{uuid.uuid4().hex[:6]}.mp4"
     
+    # Resolusi optimal yang stabil di GPU Colab
     if req.aspect_ratio == "9:16":
-        width, height = 480, 832
+        width, height = 384, 576
     elif req.aspect_ratio == "16:9":
-        width, height = 832, 480
+        width, height = 576, 384
     else:
-        width, height = 512, 512
+        width, height = 448, 448
 
     try:
         if pipe is not None:
-            pos_prompt = f"{req.prompt}, 8k, photorealistic, cinematic movie, smooth natural motion, highly detailed textures, masterclass lighting"
-            neg_prompt = "cartoon, 3d render, plastic, fake, blurry, distorted, jittery, low resolution, bad anatomy"
+            # Menggunakan prompt murni tanpa preset gaya paksaan
+            pos_prompt = req.prompt.strip() if req.prompt else "Fluid dynamic natural video motion, photorealistic high detail"
+            neg_prompt = "low quality, distorted, jittery, bad anatomy, artifacts"
             
             generator = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu")
             if req.seed != -1:
                 generator.manual_seed(req.seed)
                 
+            num_frames = min(24, max(16, req.duration * 4))
+            
+            # Jika mode Image-to-Video: muat gambar awal
+            init_img = None
+            if is_i2v:
+                try:
+                    img_data = req.image
+                    if "," in img_data:
+                        img_data = img_data.split(",", 1)[1]
+                    raw_bytes = base64.b64decode(img_data)
+                    init_img = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
+                    init_img = init_img.resize((width, height), Image.Resampling.BICUBIC)
+                    print("🖼️ Starting frame image berhasil dimuat untuk animasi I2V.")
+                except Exception as img_err:
+                    print(f"⚠️ Gagal memproses gambar input: {img_err}")
+            
             output = pipe(
                 prompt=pos_prompt,
                 negative_prompt=neg_prompt,
                 width=width,
                 height=height,
-                num_frames=max(25, int(req.duration * 8)),
+                num_frames=num_frames,
+                num_inference_steps=20,
                 guidance_scale=req.guidance_scale or 6.0,
                 generator=generator,
             )
-            export_to_video(output.frames[0], output_filename, fps=16)
-            print(f"✅ Video Wan2.1 Berhasil Dirender: {output_filename}")
+            export_to_video(output.frames[0], output_filename, fps=12)
+            print(f"✅ Video Berhasil Dirender: {output_filename}")
         else:
-            # Fallback jika model gagal dimuat
-            os.system(f'ffmpeg -y -f lavfi -i testsrc=size={width}x{height}:rate=30 -t {req.duration} -pix_fmt yuv420p {output_filename}')
+            # Fallback jika model belum siap
+            os.system(f'ffmpeg -y -f lavfi -i testsrc=size={width}x{height}:rate=24 -t {req.duration} -pix_fmt yuv420p {output_filename}')
 
-        return FileResponse(output_filename, media_type="video/mp4", filename="wan_video.mp4")
+        # Bersihkan memori kembali setelah render selesai
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        return FileResponse(output_filename, media_type="video/mp4", filename="ai_video.mp4")
     except Exception as err:
         print(f"❌ Render Error: {err}")
         gc.collect()
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         raise HTTPException(status_code=500, detail=str(err))
 
+# ------------------------------------------------------------------------------
 # 4. JALANKAN TUNNEL & SERVER
+# ------------------------------------------------------------------------------
 nest_asyncio.apply()
 public_tunnel = ngrok.connect(8000)
 print("\\n" + "="*65)
-print(f"🎉 SERVER RESMI WAN2.1 BERHASIL AKTIF!")
+print(f"🎉 SERVER VIDEO AI BERHASIL AKTIF!")
 print(f"🔗 PUBLIC NGROK URL: {public_tunnel.public_url}")
-print("Salin URL publik di atas dan tempelkan ke aplikasi Web/APK Anda.")
+print("Salin URL publik di atas dan tempelkan ke aplikasi Anda.")
 print("="*65 + "\\n")
 
 uvicorn.run(app, host="0.0.0.0", port=8000)

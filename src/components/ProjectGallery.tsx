@@ -78,7 +78,9 @@ export const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
               {/* Footer info */}
               <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
-                <span className="text-indigo-300 font-semibold">{proj.style}</span>
+                <span className="text-indigo-300 font-semibold">
+                  {proj.imageUrl ? "Image-to-Video" : "Text-to-Video"}
+                </span>
                 <span className="flex items-center gap-1 text-slate-500">
                   <Clock className="w-3 h-3" />
                   {new Date(proj.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}

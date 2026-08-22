@@ -2,8 +2,8 @@ import { AspectRatio, CameraMotion, VideoStyle } from "../types";
 
 export interface RenderConfig {
   prompt: string;
-  style: VideoStyle;
-  cameraMotion: CameraMotion;
+  style?: VideoStyle;
+  cameraMotion?: CameraMotion;
   aspectRatio: AspectRatio;
   duration: number; // in seconds
   motionIntensity: number; // 1 to 10
@@ -148,47 +148,36 @@ export class VideoRendererEngine {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. Apply Camera Motion Transformation
+    // 2. Apply Subject & Scene Motion Dynamics
     ctx.save();
     let scale = 1.0;
     let translateX = 0;
     let translateY = 0;
     let rotation = 0;
 
-    switch (config.cameraMotion) {
-      case "Slow Push-In (Zoom In)":
-        scale = 1.0 + t * 0.25 * intensity;
-        break;
-      case "Dolly Pull-Out (Zoom Out)":
-        scale = 1.25 - t * 0.25 * intensity;
-        break;
-      case "Pan Left to Right":
-        translateX = (t - 0.5) * 60 * intensity;
-        scale = 1.08;
-        break;
-      case "Pan Right to Left":
-        translateX = (0.5 - t) * 60 * intensity;
-        scale = 1.08;
-        break;
-      case "Tilt Up to Sky":
-        translateY = (t - 0.5) * 50 * intensity;
-        scale = 1.06;
-        break;
-      case "360 Orbital Rotation":
-        rotation = Math.sin(t * Math.PI * 2) * 0.04 * intensity;
-        translateX = Math.cos(t * Math.PI * 2) * 20 * intensity;
-        scale = 1.12;
-        break;
-      case "FPV Drone Flight":
-        scale = 1.0 + t * 0.4 * intensity;
-        rotation = Math.sin(t * Math.PI * 3) * 0.05 * intensity;
-        translateX = Math.sin(t * Math.PI * 2) * 25 * intensity;
-        translateY = Math.cos(t * Math.PI * 2) * 15 * intensity;
-        break;
-      default:
-        // Subtle organic breathing
-        scale = 1.0 + Math.sin(t * Math.PI) * 0.03;
-        break;
+    if (config.cameraMotion) {
+      switch (config.cameraMotion) {
+        case "Slow Push-In (Zoom In)":
+          scale = 1.0 + t * 0.15 * intensity;
+          break;
+        case "Dolly Pull-Out (Zoom Out)":
+          scale = 1.15 - t * 0.15 * intensity;
+          break;
+        case "Pan Left to Right":
+          translateX = (t - 0.5) * 30 * intensity;
+          scale = 1.04;
+          break;
+        case "Pan Right to Left":
+          translateX = (0.5 - t) * 30 * intensity;
+          scale = 1.04;
+          break;
+        default:
+          scale = 1.0 + Math.sin(t * Math.PI) * 0.02 * intensity;
+          break;
+      }
+    } else {
+      // Natural prompt motion dynamics (subtle organic breathing)
+      scale = 1.0 + Math.sin(t * Math.PI) * 0.02 * intensity;
     }
 
     // Apply center transform
